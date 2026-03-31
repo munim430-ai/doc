@@ -1,0 +1,34 @@
+{
+  "id": "mokwon",
+  "displayName": "Mokwon University (EAP)",
+  "templateFile": "template.docx",
+  "excelHeaders": [
+    "Full Name",
+    "Passport Number",
+    "Nationality",
+    "Place of Birth",
+    "Birth Year",
+    "Birth Month",
+    "Birth Day",
+    "Gender",
+    "Address",
+    "Phone",
+    "School Name",
+    "Agency Name",
+    "Entering Quarter",
+    "Consent Personal Info",
+    "Consent Identification",
+    "Consent Third Party",
+    "Sponsor Name",
+    "Sponsor Address",
+    "Sponsor Occupation",
+    "Sponsor Relation",
+    "Sponsor Tel",
+    "Sponsor HP"
+  ],
+  "defaults": {
+    "consent_personal_info": "yes",
+    "consent_identification": "yes",
+    "consent_third_party": "yes"
+  }
+}

@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Folio — Document Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased; scroll-behavior: smooth;}
+
+:root{
+  --bg:       #080808;
+  --bg-1:     #0f0f0f;
+  --bg-2:     #161616;
+  --bg-3:     #1e1e1e;
+  --bg-4:     #262626;
+  --line:     rgba(255,255,255,0.07);
+  --line-2:   rgba(255,255,255,0.12);
+  --dim:      #444;
+  --mid:      #888;
+  --ash:      #aaa;
+  --ghost:    #d4d4d4;
+  --white:    #f5f5f5;
+  --pure:     #ffffff;
+  --mono:     'Geist Mono', monospace;
+  --serif:    'Instrument Serif', serif;
+  --sans:     'Inter', sans-serif;
+  --r:        8px;
+  --r-lg:     14px;
+  --ease:     cubic-bezier(0.16,1,0.3,1);
+}
+
+body{
+  background:var(--bg);
+  color:var(--white);
+  font-family:var(--sans);
+  height:100vh;
+  margin:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.window-dragbar{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:32px;
+  z-index:9999;
+  background:transparent;
+  -webkit-app-region:drag;
+}
+.window-controls{
+  position:absolute;
+  top:6px;right:10px;
+  display:none;gap:6px;
+  -webkit-app-region:no-drag;
+}
+.window-btn{
+  width:36px;height:20px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,0.04);
+  color:rgba(255,255,255,0.82);
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.12em;
+  cursor:pointer;
+  transition:all 0.18s ease;
+}
+.window-btn:hover{
+  background:rgba(255,255,255,0.12);
+  border-color:var(--line-2);
+  color:var(--white);
+}
+.window-btn.close:hover{
+  background:rgba(255,60,60,0.18);
+  border-color:rgba(255,60,60,0.3);
+}
+
+/* ─── SCROLLBAR ──────────────────────────────── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg-4);border-radius:2px}
+
+/* ─── HEADER ─────────────────────────────────── */
+header{
+  position:relative;
+  flex-shrink:0;
+  z-index:100;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;
+  background:rgba(8,8,8,0.85);
+  backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--line);
+  margin-top:32px;
+}
+.logo{
+  font-family:var(--mono);
+  font-size:13px;
+  font-weight:500;
+  letter-spacing:0.12em;
+  color:var(--white);
+  text-transform:uppercase;
+  display:flex;align-items:center;gap:10px;
+}
+.logo-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--white);
+  box-shadow:0 0 10px rgba(255,255,255,0.6);
+  animation:blink 3s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.nav-status{
+  font-family:var(--mono);font-size:10px;
+  color:var(--dim);letter-spacing:0.1em;
+  text-transform:uppercase;
+}
+.licensed-mark{
+  position:absolute;
+  right:32px;
+  top:50%;
+  transform:translateY(-50%);
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:0.22em;
+  color:rgba(255,255,255,0.14);
+  text-transform:uppercase;
+  pointer-events:none;
+}
+
+/* ─── LANG TOGGLE ────────────────────────────── */
+.lang-toggle{
+  display:flex;align-items:center;
+  background:var(--bg-1);
+  border:1px solid var(--line-2);
+  border-radius:20px;
+  padding:2px;
+  cursor:pointer;
+  user-select:none;
+}
+.lang-opt{
+  font-family:var(--sans);
+  font-size:10px;
+  font-weight:600;
+  padding:4px 10px;
+  border-radius:16px;
+  color:var(--dim);
+  transition:all 0.2s var(--ease);
+}
+.lang-opt.active{
+  background:var(--bg-3);
+  color:var(--white);
+  box-shadow:0 2px 4px rgba(0,0,0,0.15);
+}
+
+/* ─── LAYOUT ─────────────────────────────────── */
+.shell{
+  display:grid;
+  grid-template-columns:220px 1fr 300px;
+  flex:1;
+  min-height:0;
+}
+
+/* ─── SIDEBAR ────────────────────────────────── */
+.sidebar{
+  border-right:1px solid var(--line);
+  padding:24px 0;
+  height:100%;
+  overflow-y:auto;
+  display:flex;flex-direction:column;
+  gap:0;
+}
+.sidebar-section{
+  padding:0 20px;
+  margin-bottom:32px;
+}
+.sidebar-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:12px;
+  padding:0 4px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;
+  border-radius:var(--r);
+  font-size:12px;
+  font-weight:500;
+  color:var(--mid);
+  cursor:pointer;
+  transition:all 0.15s ease;
+  user-select:none;
+  letter-spacing:0.01em;
+  border:1px solid transparent;
+}
+.nav-item:hover{color:var(--ghost);background:var(--bg-2)}
+.nav-item.active{
+  color:var(--white);
+  background:var(--bg-3);
+  border-color:var(--line-2);
+}
+.nav-icon{
+  width:14px;height:14px;opacity:0.6;flex-shrink:0;
+}
+.nav-item.active .nav-icon{opacity:1}
+.sidebar-footer{
+  margin-top:auto;
+  padding:20px;
+  border-top:1px solid var(--line);
+}
+.inst-select{
+  width:100%;
+  padding:10px 12px;
+  background:var(--bg-2);
+  border:1px solid var(--line-2);
+  border-radius:var(--r);
+  color:var(--ghost);
+  font-family:var(--sans); /* Bangla reads nicer with sans instead of mono */
+  font-size:12px;
+  letter-spacing:0.02em;
+  appearance:none;
+  cursor:pointer;
+  outline:none;
+  transition:border-color 0.15s ease;
+}
+.inst-select:focus{border-color:rgba(255,255,255,0.25)}
+.inst-select option{background:var(--bg-2)}
+.select-wrap{position:relative}
+.select-arrow{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  color:var(--dim);pointer-events:none;font-size:10px;
+}
+.inst-label{
+  font-family:var(--mono);font-size:9px;
+  letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:8px;
+}
+
+/* ─── MAIN ───────────────────────────────────── */
+main{
+  display:flex;flex-direction:column;
+  overflow-y:auto;
+}
+
+/* ─── HERO ───────────────────────────────────── */
+.hero{
+  position:relative;
+  flex-shrink:0;
+  padding:40px 48px;
+  border-bottom:1px solid var(--line);
+  overflow:hidden;
+  min-height:220px;
+  display:flex;align-items:flex-end;
+}
+/* Abstract geometric hero background */
+.hero-canvas{
+  position:absolute;
+  inset:0;
+  opacity:0.55;
+  pointer-events: none;
+}
+.hero-content{
+  position:relative;z-index:2;
+  max-width:580px;
+}
+.hero-tag{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:var(--dim);
+  margin-bottom:18px;
+  display:flex;align-items:center;gap:8px;
+}
+.hero-tag::before{
+  content:'';
+  display:block;
+  width:24px;height:1px;
+  background:var(--dim);
+}
+
+/* SCALED typography */
+h1{
+  font-family:var(--serif);
+  font-size:clamp(36px,4.5vw,52px); 
+  font-weight:400;
+  line-height:1.15;
+  letter-spacing:-0.01em;
+  color:var(--pure);
+  margin-bottom:16px;
+  animation:titleReveal 1.2s var(--ease) forwards;
+}
+h1 em{
+  font-style:italic;
+  color:rgba(255,255,255,0.7);
+}
+
+@keyframes titleReveal {
+  from { opacity:0; transform:translateY(15px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+.hero-sub{
+  font-size:13px;
+  color:var(--mid);
+  line-height:1.7;
+  font-weight:300;
+  max-width:480px;
+  font-family:var(--sans);
+}
+
+/* Advanced SVG Animations (Kept subtle flow and float) */
+@keyframes revolve { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes float { 0% { transform: translateY(0px) translateX(0px); } 50% { transform: translateY(-10px) translateX(3px); } 100% { transform: translateY(0px) translateX(0px); } }
+@keyframes dashFlow { from { stroke-dashoffset: 200; } to { stroke-dashoffset: 0; } }
+
+.astral-orbit { transform-origin: 760px 85px; animation: revolve 60s linear infinite; }
+.floating-doc { animation: float 12s var(--ease) infinite; }
+.data-stream { stroke-dasharray: 6 12; animation: dashFlow 12s linear infinite; } /* Slower */
+
+
+/* ─── WORK AREA ──────────────────────────────── */
+.work-area{
+  padding:24px 40px;
+  display:flex;flex-direction:column;gap:20px;
+}
+
+/* ─── SECTION HEADER ─────────────────────────── */
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.section-title{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+.badge{
+  padding:3px 10px;
+  border-radius:20px;
+  font-family:var(--sans);
+  font-size:11px;
+  font-weight:500;
+  border:1px solid var(--line-2);
+  color:var(--mid);
+}
+.badge.waiting{color:#888;border-color:var(--line-2)}
+.badge.ready{color:var(--white);border-color:rgba(255,255,255,0.2);background:var(--bg-3)}
+.badge.done{color:#4ade80;border-color:rgba(74,222,128,0.2);background:rgba(74,222,128,0.05)}
+.badge.error{color:#f87171;border-color:rgba(248,113,113,0.2)}
+
+/* ─── DROP ZONE ──────────────────────────────── */
+.drop-zone{
+  position:relative;
+  border:1px dashed var(--bg-4);
+  border-radius:var(--r-lg);
+  padding:32px 24px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s var(--ease);
+  background:var(--bg-1);
+  overflow:hidden;
+}
+.drop-zone::before{
+  content:'';
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.03) 0%, transparent 70%);
+  pointer-events:none;
+}
+.drop-zone:hover,.drop-zone.over{
+  border-color:rgba(255,255,255,0.15);
+  background:var(--bg-2);
+}
+.drop-zone.has-file{
+  border-color:rgba(255,255,255,0.12);
+  border-style:solid;
+  background:var(--bg-2);
+}
+.drop-zone input{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.upload-icon{
+  margin:0 auto 16px;
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+}
+.drop-title{
+  font-size:14px;font-weight:500;
+  color:var(--ghost);margin-bottom:6px;
+}
+.drop-hint{
+  font-family:var(--sans);font-size:11px;
+  color:var(--dim);
+}
+
+/* file pill */
+.file-pill{
+  display:none;
+  align-items:center;gap:12px;
+  margin-top:20px;
+  padding:12px 16px;
+  background:var(--bg-3);
+  border:1px solid var(--line-2);
+  border-radius:var(--r);
+  text-align:left;
+}
+.file-pill.show{display:flex}
+.file-pill-icon{
+  width:32px;height:32px;
+  background:var(--bg-4);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  font-size:14px;
+}
+.file-pill-name{
+  font-family:var(--mono);font-size:12px;
+  color:var(--ghost);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.file-pill-size{
+  font-family:var(--mono);font-size:10px;color:var(--dim);
+}
+.file-pill-rm{
+  width:22px;height:22px;border-radius:50%;
+  background:transparent;border:1px solid var(--line-2);
+  color:var(--mid);font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s ease;flex-shrink:0;
+}
+.file-pill-rm:hover{background:var(--bg-4);color:var(--white)}
+
+/* ─── GENERATE BUTTON ────────────────────────── */
+.btn-generate{
+  width:100%;
+  padding:16px;
+  background:var(--white);
+  border:none;
+  border-radius:var(--r);
+  color:var(--bg);
+  font-family:var(--sans);
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:0.02em;
+  cursor:pointer;
+  transition:all 0.2s var(--ease);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  position:relative;
+  overflow:hidden;
+}
+.btn-generate::after{
+  content:'';
+  position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
+  opacity:0;transition:opacity 0.2s ease;
+}
+.btn-generate:hover:not(:disabled)::after{opacity:1}
+.btn-generate:hover:not(:disabled){
+  transform:translateY(-1px);
+  box-shadow:0 8px 32px rgba(255,255,255,0.15);
+}
+.btn-generate:active:not(:disabled){transform:translateY(0)}
+.btn-generate:disabled{
+  opacity:0.25;cursor:not-allowed;transform:none;box-shadow:none;
+}
+.btn-generate.loading .label{display:none}
+.btn-generate:not(.loading) .spinner-wrap{display:none}
+.spin{
+  width:14px;height:14px;
+  border:2px solid rgba(0,0,0,0.2);
+  border-top-color:#000;
+  border-radius:50%;
+  animation:rotate 0.6s linear infinite;
+}
+@keyframes rotate{to{transform:rotate(360deg)}}
+
+/* ─── RIGHT PANEL ────────────────────────────── */
+.right-panel{
+  border-left:1px solid var(--line);
+  height:100%;
+  overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.panel-header{
+  padding:24px;
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.panel-title{
+  font-family:var(--mono);
+  font-size:10px;letter-spacing:0.16em;
+  text-transform:uppercase;color:var(--dim);
+}
+.panel-count{
+  font-family:var(--mono);font-size:11px;color:var(--mid);
+}
+.panel-body{
+  padding:16px;
+  flex:1;
+  display:flex;flex-direction:column;gap:8px;
+}
+.empty-state{
+  flex:1;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:12px;
+  padding:40px 24px;
+  text-align:center;
+}
+.empty-icon{
+  width:48px;height:48px;
+  border:1px solid var(--line-2);
+  border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;
+}
+.empty-text{
+  font-family:var(--sans);font-size:11px;
+  font-weight:500;
+  color:var(--dim);
+}
+
+/* generated file card */
+.gen-card{
+  padding:12px 14px;
+  background:var(--bg-1);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  display:flex;align-items:center;gap:10px;
+  transition:border-color 0.15s ease;
+  animation:slideIn 0.3s var(--ease) both;
+}
+.gen-card:hover{border-color:var(--line-2)}
+@keyframes slideIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.gen-card-icon{
+  width:30px;height:30px;
+  background:var(--bg-3);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:13px;
+}
+.gen-card-info{flex:1;min-width:0}
+.gen-card-name{
+  font-size:12px;font-weight:500;
+  color:var(--ghost);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;
+}
+.gen-card-meta{
+  font-family:var(--mono);font-size:10px;color:var(--dim);
+  letter-spacing:0.04em;
+}
+.dl-btn{
+  padding:5px 10px;
+  border:1px solid var(--line-2);
+  border-radius:6px;
+  background:transparent;
+  color:var(--mid);
+  font-family:var(--mono);font-size:10px;
+  letter-spacing:0.06em;
+  cursor:pointer;text-decoration:none;
+  display:flex;align-items:center;gap:4px;
+  transition:all 0.15s ease;white-space:nowrap;flex-shrink:0;
+}
+.dl-btn:hover{border-color:rgba(255,255,255,0.2);color:var(--white)}
+
+/* system status */
+.sys-status{
+  padding:16px;
+  border-top:1px solid var(--line);
+  margin-top:auto;
+}
+.sys-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 0;
+}
+.sys-key{
+  font-family:var(--mono);font-size:10px;
+  color:var(--dim);letter-spacing:0.06em;
+}
+.sys-val{
+  font-family:var(--mono);font-size:10px;
+  color:var(--mid);
+}
+.sys-val.ok{color:#4ade80}
+.sys-val.live{
+  display:flex;align-items:center;gap:5px;
+}
+.live-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:#4ade80;
+  box-shadow:0 0 6px #4ade80;
+  animation:blink 2s infinite;
+}
+
+/* ─── LOG STRIP ──────────────────────────────── */
+.log-strip{
+  margin-top:8px;
+  background:var(--bg);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:16px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--dim);
+  line-height:1.8;
+  max-height:140px;
+  overflow-y:auto;
+  letter-spacing:0.04em;
+}
+.log-line{display:flex;gap:10px}
+.log-t{color:var(--bg-4);flex-shrink:0}
+.log-line.s .log-m{color:#4ade80}
+.log-line.e .log-m{color:#f87171}
+.log-line.w .log-m{color:#fbbf24}
+.log-line.i .log-m{color:var(--ash)}
+
+/* ─── ERROR PANEL ────────────────────────────── */
+.err-panel{
+  padding:16px;
+  background:rgba(248,113,113,0.04);
+  border:1px solid rgba(248,113,113,0.12);
+  border-radius:var(--r);
+}
+.err-title{
+  font-family:var(--mono);font-size:10px;
+  letter-spacing:0.12em;text-transform:uppercase;
+  color:#f87171;margin-bottom:10px;
+}
+.err-list{
+  list-style:none;display:flex;flex-direction:column;gap:4px;
+}
+.err-list li{
+  font-family:var(--mono);font-size:10px;
+  color:var(--ash);padding-left:12px;position:relative;
+  line-height:1.6;
+}
+.err-list li::before{content:'›';position:absolute;left:0;color:#f87171}
+
+/* ─── FOOTER ─────────────────────────────────── */
+footer{
+  border-top:1px solid var(--line);
+  padding:14px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg);
+  flex-shrink:0;
+}
+.footer-l,.footer-r{
+  font-family:var(--mono);font-size:10px;
+  color:var(--dim);letter-spacing:0.08em;
+}
+.footer-r{
+  display:flex;align-items:center;gap:6px;
+}
+.footer-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:#4ade80;
+  box-shadow:0 0 5px #4ade80;
+}
+
+/* ─── TOAST ──────────────────────────────────── */
+.toasts{
+  position:fixed;bottom:24px;right:24px;
+  z-index:999;display:flex;flex-direction:column;gap:6px;
+}
+.toast{
+  padding:12px 16px;
+  border-radius:var(--r);
+  font-family:var(--mono);font-size:11px;
+  letter-spacing:0.04em;
+  display:flex;align-items:center;gap:8px;
+  animation:toastIn 0.25s var(--ease) both;
+  backdrop-filter:blur(20px);
+  border:1px solid;
+  max-width:320px;
+}
+.toast.ok{color:#4ade80;background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.15)}
+.toast.err,.toast.toast-error{color:#f87171;background:rgba(248,113,113,0.06);border-color:rgba(248,113,113,0.15)}
+.toast.info,.toast.toast-info{color:#ffffff;background:rgba(10,10,10,0.92);border-color:rgba(255,255,255,0.12)}
+.toast.toast-success{color:#4ade80;background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.15)}
+.toast.show{opacity:1;transform:translateX(0)}
+@keyframes toastIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+
+/* ─── RESULT ITEMS ───────────────────────────── */
+.result-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  margin-bottom:6px;
+  transition:background 0.15s ease;
+}
+.result-item:hover{background:var(--bg-3)}
+.ri-icon{
+  width:28px;height:28px;
+  background:var(--bg-4);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--mid);flex-shrink:0;
+}
+.ri-info{flex:1;min-width:0}
+.ri-name{
+  font-size:12px;font-weight:600;
+  color:var(--white);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ri-file{
+  font-family:var(--mono);font-size:10px;
+  color:var(--dim);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ri-dl{
+  width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line-2);border-radius:6px;
+  color:var(--mid);text-decoration:none;flex-shrink:0;
+  transition:all 0.15s ease;
+}
+.ri-dl:hover{color:var(--white);border-color:rgba(255,255,255,0.25);background:var(--bg-4)}
+
+/* ─── ZIP BUTTON ─────────────────────────────── */
+.zip-btn{
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  background:transparent;
+  border:1px dashed var(--line-2);
+  border-radius:var(--r);
+  color:var(--mid);
+  font-family:var(--mono);font-size:11px;
+  letter-spacing:0.08em;
+  cursor:pointer;
+  transition:all 0.15s ease;
+}
+.zip-btn:hover{color:var(--white);border-color:rgba(255,255,255,0.2);background:var(--bg-2)}
+
+/* ─── TEMPLATE DOWNLOAD LINK ─────────────────── */
+.tpl-link{
+  display:block;
+  margin-top:8px;
+  font-family:var(--mono);font-size:10px;
+  letter-spacing:0.08em;
+  color:var(--dim);
+  text-decoration:none;
+  transition:color 0.15s ease;
+}
+.tpl-link:hover{color:var(--ghost)}
+
+/* ─── ERROR LINES ────────────────────────────── */
+.err-line{
+  font-family:var(--mono);font-size:10px;
+  color:#f87171;
+  padding:4px 0;
+  border-bottom:1px solid rgba(248,113,113,0.08);
+}
+
+/* ─── BUSY STATE ─────────────────────────────── */
+.btn-generate.busy .label{display:none}
+.btn-generate:not(.busy) .spinner-wrap{display:none}
+</style>
+</head>
+
+<body>
+
+<div class="window-dragbar">
+  <div class="window-controls">
+    <button class="window-btn" id="minimizeBtn" type="button">_</button>
+    <button class="window-btn" id="maximizeBtn" type="button">[]</button>
+    <button class="window-btn close" id="closeBtn" type="button">X</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Folio
+  </div>
+  <div style="display:flex; align-items:center; gap:32px;">
+    <div class="nav-status" id="hdrStatus" data-i18n="hdrStat">EAP DOCUMENT ENGINE · READY</div>
+    
+    <!-- Seamless Language Toggle -->
+    <div class="lang-toggle" id="langToggle">
+      <div class="lang-opt active" id="langEn">EN</div>
+      <div class="lang-opt" id="langBn">বাং</div>
+    </div>
+  </div>
+  <div class="licensed-mark">FAHIM · AUTHORIZED</div>
+</header>
+
+<div class="shell">
+
+  <!-- ── SIDEBAR ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label" data-i18n="mod">Modules</div>
+      <div class="nav-item active" id="btnAdmissions">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="12" height="12" rx="1.5"/><path d="M4 5h6M4 7.5h4M4 10h5"/></svg>
+        <span data-i18n="btnAdm">Admissions</span>
+      </div>
+      <div class="nav-item" id="btnQueue">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5V7l2 1.5"/></svg>
+        <span data-i18n="btnQ">Processing Queue</span>
+      </div>
+      <div class="nav-item" id="btnArchive">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2h10v10H2z"/><path d="M5 5h4M5 7.5h3"/></svg>
+        <span data-i18n="btnArc">Archive Outputs</span>
+      </div>
+      <div class="nav-item" id="btnSettings">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1v12M1 7h12"/></svg>
+        <span data-i18n="btnTpl">Templates Config</span>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="inst-label" data-i18n="inst">Institution</div>
+      <div class="select-wrap">
+        <select class="inst-select" id="uniSelectSidebar">
+          <option value="" data-i18n="selInst">Select institution...</option>
+        </select>
+        <div class="select-arrow">▾</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ───────────────────────────────── -->
+  <main id="mainPanel">
+
+    <!-- HERO -->
+    <div class="hero">
+      <!-- Minimal Abstract Geometric SVG -->
+      <svg class="hero-canvas" viewBox="0 0 900 280" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <linearGradient id="glowLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="rgba(255,255,255,0)"/>
+                <stop offset="50%" stop-color="rgba(255,255,255,0.4)"/>
+                <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+            </linearGradient>
+            <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(255,255,255,0.8)" />
+                <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+            </radialGradient>
+        </defs>
+
+        <g opacity="0.4">
+            <line x1="0" y1="56" x2="900" y2="56" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="0" y1="112" x2="900" y2="112" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="0" y1="168" x2="900" y2="168" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="0" y1="224" x2="900" y2="224" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="100" y1="0" x2="100" y2="280" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+            <line x1="300" y1="0" x2="300" y2="280" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+            <line x1="500" y1="0" x2="500" y2="280" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+            <line x1="700" y1="0" x2="700" y2="280" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+        </g>
+        <line x1="-100" y1="112" x2="0" y2="112" stroke="url(#glowLine)" stroke-width="2">
+            <animate attributeName="x1" values="-100;900" dur="4s" repeatCount="indefinite" />
+            <animate attributeName="x2" values="0;1000" dur="4s" repeatCount="indefinite" />
+        </line>
+        
+        <circle cx="500" cy="-10" r="3" fill="rgba(255,255,255,0.5)">
+            <animate attributeName="cy" values="-10;290" dur="5s" repeatCount="indefinite" />
+        </circle>
+
+        <!-- Abstract Document processing flow -->
+        <g class="floating-doc" transform="translate(560, 30)">
+          <!-- Back doc -->
+          <rect x="20" y="20" width="120" height="160" rx="4" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>
+          <line x1="34" y1="52" x2="122" y2="52" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="34" y1="66" x2="104" y2="66" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <line x1="34" y1="80" x2="114" y2="80" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <!-- Middle doc -->
+          <rect x="10" y="10" width="120" height="160" rx="4" fill="#0f0f0f" stroke="rgba(255,255,255,0.09)" stroke-width="1.5"/>
+          <line x1="24" y1="42" x2="112" y2="42" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <!-- Front doc -->
+          <rect x="0" y="0" width="120" height="160" rx="4" fill="#161616" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+          <rect x="12" y="12" width="96" height="8" rx="2" fill="rgba(255,255,255,0.06)"/>
+          <line x1="12" y1="34" x2="96" y2="34" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <line x1="12" y1="46" x2="80" y2="46" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          
+          <!-- Pulsing check -->
+          <rect x="12" y="96" width="8" height="8" rx="1" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <rect x="28" y="96" width="8" height="8" rx="1" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <path d="M30 100l2 2 4-4" stroke="rgba(255,255,255,0.7)" stroke-width="1" stroke-linecap="round">
+              <animate attributeName="stroke-opacity" values="0.2;1;0.2" dur="3s" repeatCount="indefinite" />
+          </path>
+        </g>
+
+        <!-- Orbital Nodes -->
+        <g class="astral-orbit">
+            <circle cx="760" cy="85" r="1.5" fill="rgba(255,255,255,0.4)"/>
+            <circle cx="820" cy="40" r="2.5" fill="rgba(255,255,255,0.3)"/>
+            <circle cx="700" cy="140" r="2" fill="rgba(255,255,255,0.2)"/>
+            <line x1="760" y1="85" x2="820" y2="40" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <line x1="760" y1="85" x2="700" y2="140" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        </g>
+      </svg>
+
+      <div class="hero-content">
+        <div class="hero-tag" data-i18n="hTag">Document Generation Engine</div>
+        <h1><span data-i18n="h1a">Transform data into</span><br/><em data-i18n="h1b">application dossiers</em></h1>
+        <p class="hero-sub" data-i18n="hSub">Upload student spreadsheets. Receive perfectly formatted university application forms — one per applicant, layout preserved.</p>
+      </div>
+    </div>
+
+    <!-- WORK AREA -->
+    <div class="work-area">
+
+      <!-- Upload -->
+      <div>
+        <div class="section-head">
+          <div class="section-title" data-i18n="step1">Step 1 — Data Source</div>
+          <div class="badge waiting" id="uploadBadge" data-i18n="await">Awaiting upload</div>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls"/>
+          <div class="upload-icon">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5">
+              <path d="M14 20V8M9 13l5-5 5 5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 22h20" stroke-linecap="round" opacity="0.4"/>
+            </svg>
+          </div>
+          <div class="drop-title" data-i18n="dropT">Drop .xls file here</div>
+          <div class="drop-hint" data-i18n="dropH">Supported format: .xlsx · Max 50MB</div>
+        </div>
+
+        <div class="file-pill" id="filePill">
+          <div class="file-pill-icon">📗</div>
+          <div class="file-pill-name" id="pillName">—</div>
+          <div class="file-pill-size" id="pillSize">—</div>
+          <button class="file-pill-rm" id="pillRm">✕</button>
+        </div>
+      </div>
+
+      <!-- Generate -->
+      <div>
+        <div class="section-head">
+          <div class="section-title" data-i18n="step2">Step 2 — Compile</div>
+          <div class="badge" id="genBadge" style="display:none"></div>
+        </div>
+        <button class="btn-generate" id="genBtn" disabled>
+          <span class="label">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px">
+              <path d="M2 7h10M8 3l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span data-i18n="genBtn">Generate Documents</span>
+          </span>
+          <span class="spinner-wrap">
+            <div class="spin"></div> <span data-i18n="proc">Processing...</span>
+          </span>
+        </button>
+      </div>
+
+      <!-- Log -->
+      <div class="log-strip" id="logStrip">
+        <div class="log-line i"><span class="log-t">00:00:00</span><span class="log-m" data-i18n="logInit">Engine initialized · awaiting input</span></div>
+      </div>
+
+      <!-- Errors -->
+      <div id="errWrap" style="display:none"></div>
+
+    </div>
+  </main>
+
+  <!-- ── RIGHT PANEL ────────────────────────── -->
+  <aside class="right-panel" id="rightPanel">
+    <div class="panel-header">
+      <div class="panel-title" data-i18n="assets">Generated Assets</div>
+      <div class="panel-count" id="panelCount">0 of 0</div>
+    </div>
+
+    <div class="panel-body" id="panelBody">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5">
+            <rect x="3" y="2" width="14" height="16" rx="2"/><path d="M6 7h8M6 10h5M6 13h7"/>
+          </svg>
+        </div>
+        <div class="empty-text" data-i18n="empty">No documents generated yet</div>
+      </div>
+    </div>
+
+    <div class="sys-status">
+      <div class="sys-row">
+        <div class="sys-key" data-i18n="sysVer">Engine Version</div>
+        <div class="sys-val" id="sysVersion">v1.0.0-stable</div>
+      </div>
+      <div class="sys-row">
+        <div class="sys-key" data-i18n="sysMem">Memory Heap</div>
+        <div class="sys-val" id="sysMemory">...</div>
+      </div>
+      <div class="sys-row">
+        <div class="sys-key" data-i18n="sysConn">Connection</div>
+        <div class="sys-val live"><div class="live-dot"></div> <span data-i18n="sysLive">Live</span></div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<footer>
+  <div class="footer-l" data-i18n="footL">© 2026 Folio Automation Engine</div>
+  <div class="footer-r">
+    <div class="footer-dot"></div>
+    <span data-i18n="footR">Encrypted · No AI Inference · Keystone</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ── UI Localization ─────────────────────────── */
+const I18N = {
+  hdrStat:   { en:"EAP DOCUMENT ENGINE · READY", bn:"ইএপি নথি ইঞ্জিন · প্রস্তুত" },
+  mod:       { en:"Modules", bn:"মডিউল স্কোপ" },
+  btnAdm:    { en:"Admissions", bn:"ভর্তি ফর্ম" },
+  btnQ:      { en:"Processing Queue", bn:"প্রক্রিয়াকরণ সারি" },
+  btnArc:    { en:"Archive Outputs", bn:"ফোল্ডার আর্কাইভ" },
+  btnTpl:    { en:"Templates Config", bn:"টেমপ্লেট কনফিগ" },
+  inst:      { en:"Institution", bn:"বিশ্ববিদ্যালয় নির্বাচন" },
+  selInst:   { en:"Select institution...", bn:"প্রতিষ্ঠান বেছে নিন..." },
+  hTag:      { en:"Document Generation Engine", bn:"অটোমেটেড নথি প্রক্রিয়া" },
+  h1a:       { en:"Transform data into", bn:"ডেটাকে রূপান্তর করুন" },
+  h1b:       { en:"application dossiers", bn:"অ্যাপ্লিকেশন ডসিয়ারে" },
+  hSub:      { en:"Upload student spreadsheets. Receive perfectly formatted university application forms — one per applicant, layout preserved.", bn:"শিক্ষার্থীদের স্প্রেডশীট জমা দিন। প্রতিটি আবেদনকারীর জন্য সম্পূর্ণ নির্ভুল বিশ্ববিদ্যালয় আবেদন পত্র পান — কাঠামোগত ত্রুটি ছাড়াই।" },
+  step1:     { en:"Step 1 — Data Source", bn:"ধাপ ১ — ডেটা সোর্স নির্বাচন" },
+  await:     { en:"Awaiting upload", bn:"আপলোডের অপেক্ষায়" },
+  dropT:     { en:"Drop .xls file here", bn:"আবেদনকারীর এক্সেল ফাইলটি ড্রপ করুন" },
+  dropH:     { en:"Supported format: .xlsx · Max 50MB", bn:"সমর্থিত বিন্যাস: .xlsx · সর্বোচ্চ ৫০ এমবি" },
+  step2:     { en:"Step 2 — Compile", bn:"ধাপ ২ — সম্পূর্ণ করুন" },
+  genBtn:    { en:"Generate Documents", bn:"নথি তৈরি করুন" },
+  proc:      { en:"Processing...", bn:"প্রক্রিয়াকরণ চলছে..." },
+  assets:    { en:"Generated Assets", bn:"তৈরিকৃত দস্তাবেজ" },
+  empty:     { en:"No documents generated yet", bn:"এখনো কোনো নথি তৈরি হয়নি" },
+  sysVer:    { en:"Engine Version", bn:"ইঞ্জিন সংস্করণ (ভার্সন)" },
+  sysMem:    { en:"Memory Heap", bn:"মেমরি হিপ পরিমাপ" },
+  sysConn:   { en:"Connection", bn:"সংযোগ অবস্থা" },
+  sysLive:   { en:"Live", bn:"সক্রিয়" },
+  footL:     { en:"© 2026 Folio Automation Engine", bn:"© ২০২৬ ফোলিও অটোমেশন ইঞ্জিন" },
+  footR:     { en:"Encrypted · No AI Inference · Keystone", bn:"এনক্রিপ্টেড · কোন এআই নেই · কিস্টোন" },
+  logInit:   { en:"Engine initialized · awaiting input", bn:"ইঞ্জিন প্রস্তুত · প্রক্রিয়ার অপেক্ষায়" },
+  errXlsx:   { en:"Only .xlsx files accepted", bn:"শুধুমাত্র .xlsx ফাইল গ্রহণযোগ্য" },
+  ready:     { en:"ready", bn:"ফাইল প্রস্তুত" },
+  removed:   { en:"File removed", bn:"ফাইল বাতিল করা হয়েছে" },
+  procWait:  { en:"Processing...", bn:"অপেক্ষা করুন..." },
+  genD:      { en:"generated", bn:"তৈরি হয়েছে" }
+};
+
+const S = { unis:[], uni:null, file:null, busy:false, lang:'en' };
+
+/* ── DOM ─────────────────────────────────────── */
+const $=id=>document.getElementById(id);
+const dropZone=$('dropZone'), fileInput=$('fileInput');
+const filePill=$('filePill'), pillName=$('pillName'), pillSize=$('pillSize'), pillRm=$('pillRm');
+const genBtn=$('genBtn'), logStrip=$('logStrip');
+const uniSidebar=$('uniSelectSidebar');
+const panelBody=$('panelBody'), panelCount=$('panelCount'), emptyState=$('emptyState');
+const uploadBadge=$('uploadBadge'), genBadge=$('genBadge');
+
+const T = key => I18N[key]?.[S.lang] || key;
+
+function renderLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = T(key);
+  });
+  
+  if (S.lang === 'en') {
+    $('langEn').classList.add('active'); $('langBn').classList.remove('active');
+  } else {
+    $('langEn').classList.remove('active'); $('langBn').classList.add('active');
+  }
+}
+
+$('langToggle').addEventListener('click', () => {
+  S.lang = S.lang === 'en' ? 'bn' : 'en';
+  renderLang();
+});
+
+
+/* ── Helpers ─────────────────────────────────── */
+function fmtSize(b){return b<1048576?`${(b/1024).toFixed(1)} KB`:`${(b/1048576).toFixed(1)} MB`}
+function now(){return new Date().toTimeString().split(' ')[0]}
+function log(msg,t='i'){
+  const d=document.createElement('div');
+  d.className=`log-line ${t}`;
+  d.innerHTML=`<span class="log-t">${now()}</span><span class="log-m">${msg}</span>`;
+  logStrip.appendChild(d);
+  logStrip.scrollTop=logStrip.scrollHeight;
+}
+function toast(msg,t='ok'){
+  const el=document.createElement('div');
+  el.className=`toast ${t}`;
+  el.innerHTML=`<span>${t==='ok'?'✓':'✕'}</span> ${msg}`;
+  $('toasts').appendChild(el);
+  setTimeout(()=>el.remove(),3800);
+}
+function setGen(){
+  genBtn.disabled=!(S.uni && S.file && !S.busy);
+}
+function setBadge(el,text,cls){
+  el.textContent=text;el.className=`badge ${cls}`;
+  el.style.display='';
+}
+
+function toast(msg,t='ok'){
+  const el=document.createElement('div');
+  const icon = t === 'ok' ? 'âœ“' : t === 'info' ? 'â†‘' : 'âœ•';
+  el.className=`toast ${t}`;
+  el.innerHTML=`<span>${icon}</span> ${msg}`;
+  $('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), t === 'info' ? 6000 : 3800);
+}
+
+const windowControls = document.querySelector('.window-controls');
+if (window.folioWindow) {
+  windowControls.style.display = 'flex';
+  document.getElementById('closeBtn').addEventListener('click', () => {
+    window.folioWindow.close?.();
+  });
+  document.getElementById('minimizeBtn').addEventListener('click', () => {
+    window.folioWindow.minimize?.();
+  });
+  document.getElementById('maximizeBtn').addEventListener('click', () => {
+    window.folioWindow.maximize?.();
+  });
+}
+
+async function openOutputsFolder() {
+  if (window.folioWindow?.openOutputs) {
+    await window.folioWindow.openOutputs();
+    return;
+  }
+
+  await fetch('/open-outputs', { method: 'POST' });
+}
+
+/* ── System Telemetry ────────────────────────── */
+async function syncMetrics() {
+    try {
+        const res = await fetch('/metrics');
+        if (res.ok) {
+            const data = await res.json();
+            $('sysVersion').textContent = data.version;
+            $('sysMemory').textContent = data.memory;
+        }
+    } catch(e) {}
+}
+setInterval(syncMetrics, 5000);
+
+/* ── Button Mapping ──────────────────────────── */
+const activeNav = (el) => {
+    document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+};
+$('btnAdmissions').addEventListener('click', () => {
+    activeNav($('btnAdmissions'));
+    $('mainPanel').scrollIntoView({ behavior: 'smooth' });
+});
+$('btnQueue').addEventListener('click', () => {
+    activeNav($('btnQueue'));
+    $('rightPanel').style.background = 'var(--bg-1)';
+    setTimeout(() => $('rightPanel').style.background = '', 400);
+});
+$('btnArchive').addEventListener('click', () => {
+    activeNav($('btnArchive'));
+    openOutputsFolder();
+    log(T(S.lang==='bn'?'ফোল্ডার খোলা হয়েছে':'Opened Native Output Directory'), 's');
+});
+$('btnSettings').addEventListener('click', () => {
+    activeNav($('btnSettings'));
+    fetch('/open-templates', { method: 'POST' });
+    log(T(S.lang==='bn'?'টেমপ্লেট ফোল্ডার খোলা হয়েছে':'Opened Native Templates Directory'), 's');
+});
+
+
+/* ── Universities ────────────────────────────── */
+async function loadUnis(){
+  try{
+    const r=await fetch('/universities');
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error || 'Server error');
+    S.unis=d.universities;
+    const opt=`<option value="" data-i18n="selInst">${T('selInst')}</option>`+
+      d.universities.map(u=>`<option value="${u.id}">${u.displayName || u.id}</option>`).join('');
+    uniSidebar.innerHTML=opt;
+    log(`${d.universities.length} institution(s) loaded`,'s');
+  }catch(e){
+    log(`Failed to load institutions: ${e.message}`,'e');
+    $('hdrStatus').textContent='ENGINE ERROR';
+  }
+}
+
+uniSidebar.addEventListener('change',()=>{
+  S.uni=uniSidebar.value||null;
+  setGen();
+  if(S.uni){log(`Institution selected: ${S.uni}`)}
+});
+
+/* ── File Handling ───────────────────────────── */
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('over')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('over');
+  if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change',()=>{if(fileInput.files[0])setFile(fileInput.files[0])});
+
+function setFile(f){
+  if(!f.name.match(/\.(xlsx|csv|xls)$/i)){toast(T('errXlsx'),'err');return}
+  S.file=f;
+  pillName.textContent=f.name;
+  pillSize.textContent=fmtSize(f.size);
+  filePill.classList.add('show');
+  dropZone.classList.add('has-file');
+  setBadge(uploadBadge,`${f.name} `+T('ready'),'ready');
+  log(`File loaded: ${f.name}`,'s');
+  setGen();
+}
+pillRm.addEventListener('click',()=>{
+  S.file=null; fileInput.value='';
+  filePill.classList.remove('show');
+  dropZone.classList.remove('has-file');
+  setBadge(uploadBadge,T('await'),'waiting');
+  log(T('removed'));setGen();
+});
+
+/* ── Generate ────────────────────────────────── */
+genBtn.addEventListener('click',async()=>{
+  if(!S.uni||!S.file||S.busy)return;
+  S.busy=true;
+  genBtn.classList.add('loading');genBtn.disabled=true;
+  setBadge(genBadge,T('procWait'),'waiting');
+  $('errWrap').style.display='none';
+  // clear panel
+  [...panelBody.querySelectorAll('.gen-card')].forEach(c=>c.remove());
+  panelCount.textContent='0 of 0';
+  emptyState.style.display='flex';
+
+  log(`Starting generation · university: ${S.uni}`);
+
+  try{
+    const fd=new FormData();
+    fd.append('university',S.uni);
+    fd.append('file',S.file);
+    const res=await fetch('/generate',{method:'POST',body:fd});
+    const d=await res.json();
+
+    if(!d.success){
+      const errMsg = d.error || 'Unknown Generation Failure';
+      log(`Generation failed: ${errMsg}`,'e');
+      toast(errMsg,'err');
+      setBadge(genBadge,'Failed','error');
+      return;
+    }
+
+    emptyState.style.display='none';
+    d.files.forEach((f,i)=>{
+      const card=document.createElement('div');
+      card.className='gen-card';
+      card.style.animationDelay=`${i*0.04}s`;
+      card.innerHTML=`
+        <div class="gen-card-icon">📄</div>
+        <div class="gen-card-info">
+          <div class="gen-card-name">${f.applicant||f.filename||`Applicant ${f.index}`}</div>
+          <div class="gen-card-meta">${f.filename}</div>
+        </div>
+        <a class="dl-btn" href="${f.path}" download>↓ docx</a>`;
+      panelBody.appendChild(card);
+    });
+    
+    panelCount.textContent=`${d.generated} / ${d.totalRows}`;
+    setBadge(genBadge,`${d.generated} `+T('genD')+` · ${d.elapsedMs}ms`,'done');
+    log(`✓ ${d.generated} document(s) generated`,'s');
+    
+    toast(`${d.generated} document(s) ready`,'ok');
+
+    if(d.warnings && d.warnings.length){
+      const w=$('errWrap');w.style.display='block';
+      w.innerHTML=`<div class="err-panel"><div class="err-title">⚠ Warning Details</div><ul class="err-list">${d.warnings.map(e=>`<li>${e}</li>`).join('')}</ul></div>`;
+    }
+  }catch(err){
+    log(`Network error: ${err.message}`,'e');
+    toast('Network Error','err');
+    setBadge(genBadge,'Error','error');
+  }finally{
+    S.busy=false;genBtn.classList.remove('loading');setGen();
+  }
+});
+
+/* ── Init ────────────────────────────────────── */
+if (window.folioWindow?.onUpdateStatus) {
+  window.folioWindow.onUpdateStatus((payload) => {
+    if (payload?.message) {
+      toast(payload.message, payload.type || 'info');
+    }
+  });
+}
+
+syncMetrics();
+loadUnis();
+renderLang(); // Init texts
+</script>
+</body>
+</html>
+

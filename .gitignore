@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+uploads/
+outputs/
+test_data_root/
+scripts/test_input.xlsx
+scripts/test_output.docx
+scripts/document.xml
+*.log
+.DS_Store
+Thumbs.db
