@@ -400,6 +400,14 @@ h1 em{
   font-family:var(--sans);font-size:11px;
   color:var(--dim);
 }
+.tpl-dl-link{
+  margin-top:10px;display:inline-block;
+  font-family:var(--sans);font-size:11px;
+  color:rgba(255,255,255,0.35);text-decoration:none;
+  border-bottom:1px solid rgba(255,255,255,0.12);
+  transition:color .15s,border-color .15s;
+}
+.tpl-dl-link:hover{color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.35);}
 
 /* file pill */
 .file-pill{
@@ -931,6 +939,7 @@ footer{
           </div>
           <div class="drop-title" data-i18n="dropT">Drop .xls file here</div>
           <div class="drop-hint" data-i18n="dropH">Supported format: .xlsx · Max 50MB</div>
+          <a class="tpl-dl-link" href="/excel-template/mokwon" download data-i18n="dlTpl">↓ Download student template (.xlsx)</a>
         </div>
 
         <div class="file-pill" id="filePill">
@@ -1036,6 +1045,7 @@ const I18N = {
   await:     { en:"Awaiting upload", bn:"আপলোডের অপেক্ষায়" },
   dropT:     { en:"Drop .xls file here", bn:"আবেদনকারীর এক্সেল ফাইলটি ড্রপ করুন" },
   dropH:     { en:"Supported format: .xlsx · Max 50MB", bn:"সমর্থিত বিন্যাস: .xlsx · সর্বোচ্চ ৫০ এমবি" },
+  dlTpl:     { en:"↓ Download student template (.xlsx)", bn:"↓ শিক্ষার্থী টেমপ্লেট ডাউনলোড করুন (.xlsx)" },
   step2:     { en:"Step 2 — Compile", bn:"ধাপ ২ — সম্পূর্ণ করুন" },
   genBtn:    { en:"Generate Documents", bn:"নথি তৈরি করুন" },
   proc:      { en:"Processing...", bn:"প্রক্রিয়াকরণ চলছে..." },

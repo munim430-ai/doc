@@ -9,10 +9,10 @@
 const fs   = require('fs');
 const path = require('path');
 
-// Create a simple 32x32 ICO by writing a valid minimal ICO structure
+// Create a simple 256x256 ICO by writing a valid minimal ICO structure.
 // We'll generate a BMP-based ICO with a simple design
 
-const SIZE = 32;
+const SIZE = 256;
 const pixels = Buffer.alloc(SIZE * SIZE * 4); // BGRA
 
 // Dark navy background
@@ -39,17 +39,18 @@ function setPixel(x, y, color) {
   pixels[off + 3] = color.a;
 }
 
-// F shape (scaled to ~18px tall, centered)
-const startX = 9, startY = 7;
-// Vertical stroke
-for (let y = 0; y < 18; y++) setPixel(startX, startY + y, fg);
-for (let y = 0; y < 18; y++) setPixel(startX + 1, startY + y, fg);
-// Top horizontal
-for (let x = 0; x < 12; x++) setPixel(startX + x, startY, fg);
-for (let x = 0; x < 12; x++) setPixel(startX + x, startY + 1, fg);
-// Middle horizontal
-for (let x = 0; x < 9; x++) setPixel(startX + x, startY + 8, fg);
-for (let x = 0; x < 9; x++) setPixel(startX + x, startY + 9, fg);
+function fillRect(x, y, width, height, color) {
+  for (let py = y; py < y + height; py++) {
+    for (let px = x; px < x + width; px++) {
+      setPixel(px, py, color);
+    }
+  }
+}
+
+// Bold "F" sized for installer and app launcher use.
+fillRect(64, 44, 28, 168, fg);
+fillRect(64, 44, 128, 28, fg);
+fillRect(64, 108, 96, 28, fg);
 
 // Build ICO file manually
 // ICO header (6 bytes) + directory entry (16 bytes) + BMP info header (40 bytes) + pixels
@@ -67,9 +68,9 @@ buf.writeUInt16LE(0, pos); pos += 2;         // Reserved
 buf.writeUInt16LE(1, pos); pos += 2;         // Type: 1 = ICO
 buf.writeUInt16LE(1, pos); pos += 2;         // Count: 1 image
 
-// Directory entry
-buf.writeUInt8(SIZE, pos); pos += 1;         // Width
-buf.writeUInt8(SIZE, pos); pos += 1;         // Height
+// Directory entry: ICO uses 0 to represent 256.
+buf.writeUInt8(SIZE === 256 ? 0 : SIZE, pos); pos += 1; // Width
+buf.writeUInt8(SIZE === 256 ? 0 : SIZE, pos); pos += 1; // Height
 buf.writeUInt8(0, pos); pos += 1;            // Color count (0 = no palette)
 buf.writeUInt8(0, pos); pos += 1;            // Reserved
 buf.writeUInt16LE(1, pos); pos += 2;         // Color planes
@@ -104,7 +105,7 @@ for (let y = SIZE - 1; y >= 0; y--) {
 // AND mask (all zeros = opaque)
 for (let i = 0; i < AND_MASK_SIZE; i++) buf[pos++] = 0;
 
-const outPath = path.join(__dirname, '..', 'assets', 'icon.ico');
+const outPath = path.join(__dirname, '..', 'build-resources', 'icon.ico');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, buf);
 console.log('Icon created:', outPath, '(', buf.length, 'bytes)');

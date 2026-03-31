@@ -10,3 +10,17 @@ scripts/document.xml
 *.log
 .DS_Store
 Thumbs.db
+
+# Reference docs containing student personal data — never commit
+*_FILLED.docx
+*_FILLED.doc
+
+# Generated at build time
+build-resources/
+
+# Test / scratch files
+build-test.txt
+public/write-test.txt
+scripts/mock_outputs/
+scripts/mock_students_*.xlsx
+scripts/mockBatchTest.js

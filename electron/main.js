@@ -11,7 +11,8 @@
  *  5. Serve as the single entry point — no browser, no address bar.
  */
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
@@ -144,6 +145,32 @@ function createWindow(port) {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// ── Auto-update ────────────────────────────────────────────────────────────────
+function setupAutoUpdater() {
+  if (!app.isPackaged) return; // skip in dev
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'A new version of Folio has been downloaded.\nRestart now to apply the update?',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[AutoUpdater] Error:', err?.message ?? err);
+  });
+
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
 // ── IPC handlers ───────────────────────────────────────────────────────────────
 ipcMain.on('window:close',    () => mainWindow?.close());
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
@@ -159,6 +186,7 @@ app.whenReady().then(async () => {
     ensureUserData();
     const port = await startExpressServer();
     createWindow(port);
+    setupAutoUpdater();
   } catch (err) {
     console.error('Fatal startup error:', err);
     app.quit();
